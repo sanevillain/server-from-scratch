@@ -5,38 +5,37 @@ mod http_server {
     };
     use std::str;
 
-    const RES_HEADERS: &str = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n";
-    const HELLO_WORLD: &str = "<!DOCTYPE html><html><head><title>hello</title></head><body><h1>HELLO WORLD</h1></body></html>\r\n\r\n";
-    pub struct Server {
+    const RES_HEADERS: &str = "\
+HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n";
+    const HELLO_WORLD: &str = "\
+<!DOCTYPE html><html><head><title>hello</title></head><body><h1>HELLO WORLD</h1></body></html>\r\n\r\n";
+
+    pub struct HttpServer {
         server_socket_fd: i32,
     }
 
-    impl Server {
+    impl HttpServer {
         pub fn new(port: u16) -> Result<Self, nix::Error> {
-            let mut server = Server {
+            let mut http_server = HttpServer {
                 server_socket_fd: 0,
             };
 
-            server.set_socket_fd()?;
-            server.bind_socket(port)?;
-            server.listen_and_serve()?;
+            http_server.set_socket_fd()?;
+            http_server.bind_socket(port)?;
+            http_server.listen_and_serve()?;
 
-            Ok(server)
+            Ok(http_server)
         }
 
         fn set_socket_fd(&mut self) -> Result<(), nix::Error> {
-            match socket::socket(
+            self.server_socket_fd = socket::socket(
                 AddressFamily::Inet,
                 SockType::Stream,
                 socket::SockFlag::empty(),
                 SockProtocol::Tcp,
-            ) {
-                Ok(server_socket_fd) => {
-                    self.server_socket_fd = server_socket_fd;
-                    Ok(())
-                }
-                Err(e) => Err(e),
-            }
+            )?;
+
+            Ok(())
         }
 
         fn bind_socket(&mut self, port: u16) -> Result<(), nix::Error> {
@@ -79,6 +78,6 @@ mod http_server {
     }
 }
 
-pub fn listen_and_serve(port: u16) -> Result<http_server::Server, nix::Error> {
-    http_server::Server::new(port)
+pub fn listen_and_serve(port: u16) -> Result<http_server::HttpServer, nix::Error> {
+    http_server::HttpServer::new(port)
 }
