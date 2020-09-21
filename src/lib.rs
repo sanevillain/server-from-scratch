@@ -51,8 +51,6 @@ HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n";
             let res = res_headers.as_slice();
 
             client_socket.send(res)?;
-            client_socket.shutdown()?;
-
             Ok(())
         }
     }

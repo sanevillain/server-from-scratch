@@ -60,6 +60,12 @@ impl Socket {
     }
 }
 
+impl Drop for Socket {
+    fn drop(&mut self) {
+        self.shutdown().unwrap();
+    }
+}
+
 fn nix_to_io_error(err: nix::Error, err_message: &'static str) -> io::Error {
     match err.as_errno() {
         Some(err_num) => io::Error::from_raw_os_error(err_num as i32),
