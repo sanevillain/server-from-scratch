@@ -4,12 +4,6 @@ pub mod socket;
 mod http_server {
     use super::socket::Socket;
     use std::io;
-    use std::str;
-
-    const RES_HEADERS: &str = "\
-HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n";
-    const HELLO_WORLD: &str = "\
-<!DOCTYPE html><html><head><title>hello</title></head><body><h1>HELLO WORLD</h1></body></html>\r\n\r\n";
 
     pub struct HttpServer {
         socket: Socket,
@@ -18,44 +12,36 @@ HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n";
     impl HttpServer {
         pub fn new(port: u16) -> io::Result<Self> {
             let socket = Socket::new()?;
+
             socket.bind(port)?;
 
-            let http_server = HttpServer { socket };
-            http_server.listen_and_serve()?;
-
-            Ok(http_server)
+            Ok(HttpServer { socket })
         }
 
-        fn listen_and_serve(&self) -> io::Result<()> {
+        pub fn listen_and_serve<F>(&self, handler: F) -> io::Result<()>
+        where
+            F: Fn(&[u8]) -> Vec<u8>,
+        {
             self.socket.listen(128)?;
 
-            loop {
-                self.handle_connection()?;
+            for client_socket in self.socket.incoming() {
+                let mut read_buffer = vec![0; 30000];
+
+                client_socket.receive(&mut read_buffer)?;
+
+                let res = handler(&read_buffer);
+
+                client_socket.send(&res)?;
             }
-        }
 
-        fn handle_connection(&self) -> io::Result<()> {
-            let client_socket = self.socket.accept()?;
-
-            let mut buffer = vec![0; 30000];
-            client_socket.receive(&mut buffer)?;
-
-            let request_bytes = &buffer.to_owned();
-            let request_content = str::from_utf8(request_bytes).unwrap();
-
-            println!("Request content:\n\n{}", request_content);
-
-            let mut res_headers: Vec<u8> = RES_HEADERS.as_bytes().to_owned();
-            let res_content: Vec<u8> = HELLO_WORLD.as_bytes().to_owned();
-            res_headers.extend(res_content);
-            let res = res_headers.as_slice();
-
-            client_socket.send(res)?;
             Ok(())
         }
     }
 }
 
-pub fn listen_and_serve(port: u16) -> io::Result<http_server::HttpServer> {
-    http_server::HttpServer::new(port)
+pub fn listen_and_serve<F>(port: u16, handler: F) -> io::Result<()>
+where
+    F: Fn(&[u8]) -> Vec<u8>,
+{
+    http_server::HttpServer::new(port)?.listen_and_serve(handler)
 }
