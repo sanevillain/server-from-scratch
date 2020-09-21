@@ -58,11 +58,33 @@ impl Socket {
             .map_err(|err| nix_to_io_error(err, "Socket Shutdown Error!"))?;
         Ok(())
     }
+
+    pub fn incoming(&self) -> Connections {
+        Connections::new(self)
+    }
 }
 
 impl Drop for Socket {
     fn drop(&mut self) {
         self.shutdown().unwrap();
+    }
+}
+
+pub struct Connections<'a> {
+    listener: &'a Socket,
+}
+
+impl<'a> Connections<'a> {
+    pub fn new(listener: &'a Socket) -> Self {
+        Connections { listener }
+    }
+}
+
+impl<'a> Iterator for Connections<'a> {
+    type Item = Socket;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.listener.accept().ok()
     }
 }
 
