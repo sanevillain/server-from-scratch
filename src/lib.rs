@@ -4,6 +4,7 @@ pub mod socket;
 mod http_server {
     use super::socket::Socket;
     use std::io;
+    use std::collections::HashMap;
 
     pub struct HttpServer {
         socket: Socket,
@@ -36,6 +37,10 @@ mod http_server {
 
             Ok(())
         }
+    }
+
+    pub struct Request {
+        headers: HashMap<String, Vec<String>>
     }
 }
 
