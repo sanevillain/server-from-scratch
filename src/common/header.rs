@@ -96,9 +96,9 @@ impl ToString for Header {
         let mut lines = "".to_string();
 
         for key in self.ordered_keys.clone() {
-            let values = self.values(&key).unwrap();
             let mut line = format!("{}: ", key);
 
+            let values = self.values(&key).unwrap();
             let len = values.len();
 
             if len == 1 {
@@ -180,9 +180,7 @@ mod test_header {
                 ],
             );
 
-            for val in vals.iter() {
-                header.add(key, val);
-            }
+            vals.iter().for_each(|val| header.add(key, val));
 
             assert_eq!(vals[0], header.get(key).unwrap());
         }
@@ -218,10 +216,7 @@ mod test_header {
                 ],
             );
 
-            for val in vals.iter() {
-                header.add(key, val);
-            }
-
+            vals.iter().for_each(|val| header.add(key, val));
             header.del(key);
 
             assert_eq!(None, header.get(key));
@@ -239,11 +234,11 @@ mod test_header {
         }
 
         #[test]
-        fn test_values_for_existing_key_should_return_vec_for_single_value() {
+        fn test_values_for_existing_key_should_return_vec_with_single_value() {
             let mut header = Header::new();
 
-            let (key, val) = ("Host", "docs.apigee.com");
-            header.add(key, val);
+            let (key, vals) = ("Host", vec!["docs.apigee.com"]);
+            vals.iter().for_each(|val| header.add(key, val));
 
             let expected = vec!["docs.apigee.com"];
             assert_eq!(expected, header.values(key).unwrap());
@@ -264,9 +259,7 @@ mod test_header {
                 ],
             );
 
-            for val in vals.iter() {
-                header.add(key, val);
-            }
+            vals.iter().for_each(|val| header.add(key, val));
 
             assert_eq!(vals, header.values(key).unwrap());
         }
@@ -371,7 +364,6 @@ mod test_header {
             User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:81.0) Gecko/20100101 Firefox/81.0\r\n";
 
             let header_string = Header::from_str(expected).unwrap().to_string();
-
             assert_eq!(expected, header_string);
         }
 
@@ -389,7 +381,6 @@ mod test_header {
             Cookie: django_language=en\r\n";
 
             let header_string = Header::from_str(expected).unwrap().to_string();
-
             assert_eq!(expected, header_string);
         }
     }
