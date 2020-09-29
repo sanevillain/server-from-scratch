@@ -1,4 +1,10 @@
-use std::{collections::HashMap, default::Default, io::Error, str::FromStr, string::ToString};
+use std::{
+    collections::HashMap,
+    default::Default,
+    io::{Error, ErrorKind},
+    str::FromStr,
+    string::ToString,
+};
 
 #[derive(Debug)]
 pub struct Header {
@@ -16,6 +22,7 @@ impl Header {
 
     pub fn add(&mut self, key: &str, val: &str) {
         let key: String = key
+            .trim()
             .chars()
             .filter(|c| c.is_alphanumeric() || *c == '-')
             .collect();
@@ -34,25 +41,69 @@ impl Header {
     }
 
     pub fn del(&mut self, key: &str) {
-        if key.is_empty() || !self.headers.contains_key(key) {
-            return;
+        if self.headers.contains_key(key) {
+            self.headers.remove(key);
         }
-
-        self.headers.remove(key);
     }
 
     pub fn get(&self, key: &str) -> Option<String> {
-        let values = self.values(key)?;
-        values.first().map(|s| s.to_owned())
+        self.values(key)?.first().map(|s| s.to_owned())
     }
 
     pub fn values(&self, key: &str) -> Option<Vec<String>> {
-        if key.is_empty() || !self.headers.contains_key(key) {
-            return None;
+        if self.headers.contains_key(key) {
+            Some(self.headers.get(key).unwrap().clone())
+        } else {
+            None
+        }
+    }
+}
+
+impl Header {
+    pub fn create_from_lines(lines: Vec<&str>) -> Result<Header, Error> {
+        let mut header = Header::new();
+
+        for line in lines {
+            let line = line.trim();
+
+            if !line.trim().is_empty() {
+                let (key, values) = Header::parse_key_values_line(line)?;
+
+                for val in values.split(",") {
+                    header.add(&key, val.trim());
+                }
+            }
         }
 
-        let values = self.headers.get(key).unwrap().clone();
-        Some(values)
+        Ok(header)
+    }
+
+    fn parse_key_values_line(line: &str) -> Result<(String, String), Error> {
+        if !line.is_empty() && line.contains(":") {
+            Ok((
+                line.chars().take_while(|c| *c != ':').collect(),
+                line.chars().skip_while(|c| *c != ' ').collect(),
+            ))
+        } else {
+            Err(Error::new(
+                ErrorKind::InvalidData,
+                "Couldn't Read Request Headers",
+            ))
+        }
+    }
+
+    fn line_from_key_and_values(key: &str, values: Vec<String>) -> String {
+        let mut line = format!("{}: ", key);
+
+        for (i, val) in values.iter().enumerate() {
+            if i == values.len() - 1 {
+                line += &format!("{}\r\n", val);
+            } else {
+                line += &format!("{}, ", val);
+            }
+        }
+
+        line
     }
 }
 
@@ -66,27 +117,7 @@ impl FromStr for Header {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut header = Header::new();
-
-        let headers_body: Vec<_> = s.split("\r\n\r\n").collect();
-        let headers = headers_body.get(0).unwrap();
-
-        for line in headers.split("\r\n") {
-            if line.is_empty() || !line.contains(":") {
-                continue;
-            }
-
-            let (key, values): (String, String) = (
-                line.chars().take_while(|c| *c != ':').collect(),
-                line.chars().skip_while(|c| *c != ' ').collect(),
-            );
-
-            values.split(",").for_each(|v| {
-                header.add(&key, v.trim());
-            });
-        }
-
-        Ok(header)
+        Header::create_from_lines(s.split("\r\n").filter(|l| l.contains(":")).collect())
     }
 }
 
@@ -94,33 +125,13 @@ impl ToString for Header {
     fn to_string(&self) -> String {
         let mut lines = "".to_string();
 
-        for key in self.ordered_keys.clone() {
-            let mut line = format!("{}: ", key);
-
-            let values = self.values(&key).unwrap();
-            let len = values.len();
-
-            if len == 1 {
-                line += values.iter().nth(0).unwrap();
-            } else {
-                values
-                    .iter()
-                    .enumerate()
-                    .map(|(i, v)| {
-                        if i < (len - 1) {
-                            format!("{}, ", v)
-                        } else {
-                            v.to_string()
-                        }
-                    })
-                    .for_each(|v| line += &v);
-            }
-
-            lines += &format!("{}\r\n", line);
+        for key in self.ordered_keys.iter() {
+            let values = self.values(key).unwrap();
+            let line = Header::line_from_key_and_values(key, values);
+            lines += &line;
         }
 
-        lines += "\r\n";
-        lines.to_owned()
+        format!("{}\r\n", lines)
     }
 }
 

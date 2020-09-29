@@ -70,9 +70,8 @@ impl Request {
 }
 
 impl Request {
-    fn create_header(header_lines: &Vec<&str>) -> Result<Header, InvalidHttpRequestError> {
-        let header_lines: Vec<_> = header_lines.iter().skip(1).map(|s| *s).collect();
-        Header::create_from_lines(header_lines).map_err(|_| InvalidHttpRequestError())
+    fn create_header(headers: &str) -> Result<Header, InvalidHttpRequestError> {
+        Header::from_str(headers).map_err(|_| InvalidHttpRequestError())
     }
 
     fn create_method(first_header_line: &Vec<&str>) -> Result<Method, InvalidHttpRequestError> {
@@ -110,7 +109,7 @@ impl FromStr for Request {
         let method = Request::create_method(&first_header_line)?;
         let url = Request::create_url(&first_header_line)?;
         let http_version = Request::create_http_version(&first_header_line)?;
-        let header = Request::create_header(&header_lines)?;
+        let header = Request::create_header(headers)?;
 
         Ok(Request::new(method, url, http_version, header))
     }

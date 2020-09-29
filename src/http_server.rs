@@ -41,7 +41,6 @@ impl HttpServer {
             let res = handler(req);
 
             client_socket.send(&res)?;
-            println!("here");
         }
 
         Ok(())
