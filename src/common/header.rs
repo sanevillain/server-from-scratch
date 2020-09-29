@@ -34,8 +34,6 @@ impl Header {
     }
 
     pub fn del(&mut self, key: &str) {
-        let key = key.trim();
-
         if key.is_empty() || !self.headers.contains_key(key) {
             return;
         }
@@ -49,8 +47,6 @@ impl Header {
     }
 
     pub fn values(&self, key: &str) -> Option<Vec<String>> {
-        let key = key.trim();
-
         if key.is_empty() || !self.headers.contains_key(key) {
             return None;
         }

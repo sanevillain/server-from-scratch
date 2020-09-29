@@ -66,7 +66,10 @@ impl Socket {
 
 impl Drop for Socket {
     fn drop(&mut self) {
-        self.shutdown().unwrap();
+        match self.shutdown() {
+            Ok(_) => println!("Connection closed for: {}.", self.fd),
+            Err(_) => println!("Coudln't close connection for: {}.", self.fd),
+        }
     }
 }
 

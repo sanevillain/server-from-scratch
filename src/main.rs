@@ -1,5 +1,6 @@
-use std::str;
-use std::io;
+extern crate ctrlc;
+use server_from_scratch::{http_request::Request, listen_and_serve};
+use std::{io, str, process::exit};
 
 const RES_HEADERS: &str = "\
 HTTP/1.1 200 OK\r\n\
@@ -16,16 +17,17 @@ const HELLO_WORLD: &str = "\
     </body>\
 </html>\r\n\r\n";
 
-
 fn main() -> io::Result<()> {
-    server_from_scratch::listen_and_serve(8080, handler)
+    ctrlc::set_handler(move || {
+        println!("caught!");
+        exit(0);
+    }).expect("Error setting Ctrl-C handler");
+
+    listen_and_serve(8080, handler)
 }
 
-fn handler(req: &[u8]) -> Vec<u8> {
-    let request_bytes = &req.to_owned();
-    let request_content = str::from_utf8(request_bytes).unwrap();
-
-    println!("Request content:\n\n{}", request_content);
+fn handler(req: Request) -> Vec<u8> {
+    println!("Req: {:?}", req);
 
     let res_headers: Vec<u8> = RES_HEADERS.as_bytes().to_owned();
     let res_content: Vec<u8> = HELLO_WORLD.as_bytes().to_owned();
