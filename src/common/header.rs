@@ -68,7 +68,10 @@ impl FromStr for Header {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut header = Header::new();
 
-        for line in s.split("\r\n") {
+        let headers_body: Vec<_> = s.split("\r\n\r\n").collect();
+        let headers = headers_body.get(0).unwrap();
+
+        for line in headers.split("\r\n") {
             if line.is_empty() || !line.contains(":") {
                 continue;
             }
@@ -116,6 +119,7 @@ impl ToString for Header {
             lines += &format!("{}\r\n", line);
         }
 
+        lines += "\r\n";
         lines.to_owned()
     }
 }
@@ -268,7 +272,7 @@ mod test_header {
         #[test]
         fn test_from_str_should_skip_first_line() {
             let header = Header::from_str(
-                "GET /api-platform/antipatterns/multi-value-http-headers HTTP/1.1\r\n\\",
+                "GET /api-platform/antipatterns/multi-value-http-headers HTTP/1.1\r\n\r\n",
             )
             .unwrap();
 
@@ -280,7 +284,7 @@ mod test_header {
             let header = Header::from_str(
                 "GET /api-platform/antipatterns/multi-value-http-headers HTTP/1.1\r\n\
                 Host: docs.apigee.com\r\n\
-                User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:81.0) Gecko/20100101 Firefox/81.0\r\n\\"
+                User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:81.0) Gecko/20100101 Firefox/81.0\r\n\r\n"
             ).unwrap();
 
             let expected = vec![
@@ -300,7 +304,7 @@ mod test_header {
                 "GET /api-platform/antipatterns/multi-value-http-headers HTTP/1.1\r\n\
                 Host: docs.apigee.com\r\n\
                 User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:81.0) Gecko/20100101 Firefox/81.0\r\n\
-                Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8\r\n"
+                Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8\r\n\r\n"
             ).unwrap();
 
             let expected = vec![
@@ -327,7 +331,7 @@ mod test_header {
                 Referer: https://duckduckgo.com/\r\n\
                 Upgrade-Insecure-Requests: 1\r\n\
                 Connection: keep-alive\r\n\
-                Cookie: django_language=en\r\n"
+                Cookie: django_language=en\r\n\r\n"
             ).unwrap();
 
             let expected = vec![
@@ -357,7 +361,7 @@ mod test_header {
         fn test_to_string_with_single_values() {
             let expected = "\
             Host: docs.apigee.com\r\n\
-            User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:81.0) Gecko/20100101 Firefox/81.0\r\n";
+            User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:81.0) Gecko/20100101 Firefox/81.0\r\n\r\n";
 
             let header_string = Header::from_str(expected).unwrap().to_string();
             assert_eq!(expected, header_string);
@@ -374,7 +378,7 @@ mod test_header {
             Referer: https://duckduckgo.com/\r\n\
             Upgrade-Insecure-Requests: 1\r\n\
             Connection: keep-alive\r\n\
-            Cookie: django_language=en\r\n";
+            Cookie: django_language=en\r\n\r\n";
 
             let header_string = Header::from_str(expected).unwrap().to_string();
             assert_eq!(expected, header_string);
