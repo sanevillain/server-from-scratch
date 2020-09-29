@@ -59,8 +59,37 @@ pub struct Request {
 }
 
 impl Request {
-    pub fn new() -> Self {
-        Default::default()
+    pub fn new(method: Method, url: URL, http_version: Version, header: Header) -> Self {
+        Request {
+            method,
+            url,
+            http_version,
+            header,
+        }
+    }
+}
+
+impl Request {
+    fn create_header(header_lines: &Vec<&str>) -> Result<Header, InvalidHttpRequestError> {
+        let header_lines: Vec<_> = header_lines.iter().skip(1).map(|s| *s).collect();
+        Header::create_from_lines(header_lines).map_err(|_| InvalidHttpRequestError())
+    }
+
+    fn create_method(first_header_line: &Vec<&str>) -> Result<Method, InvalidHttpRequestError> {
+        let method = *first_header_line.get(0).ok_or(InvalidHttpRequestError())?;
+        Method::from_str(method)
+    }
+
+    fn create_url(first_header_line: &Vec<&str>) -> Result<URL, InvalidHttpRequestError> {
+        let url = *first_header_line.get(1).ok_or(InvalidHttpRequestError())?;
+        URL::from_str(url).map_err(|_| InvalidHttpRequestError())
+    }
+
+    fn create_http_version(
+        first_header_line: &Vec<&str>,
+    ) -> Result<Version, InvalidHttpRequestError> {
+        let http_version = *first_header_line.get(2).ok_or(InvalidHttpRequestError())?;
+        Version::from_str(http_version).map_err(|_| InvalidHttpRequestError())
     }
 }
 
@@ -68,31 +97,21 @@ impl FromStr for Request {
     type Err = InvalidHttpRequestError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut request: Request = Default::default();
-        request.header = Header::from_str(s).unwrap();
+        let headers_and_body: Vec<_> = s.split("\r\n\r\n").collect();
+        let headers = headers_and_body.first().ok_or(InvalidHttpRequestError())?;
 
-        let lines: Vec<_> = s.split("\r\n").collect();
-        let first_line: Vec<_> = lines
-            .get(0)
+        let header_lines: Vec<_> = headers.split("\r\n").collect();
+        let first_header_line: Vec<_> = header_lines
+            .first()
             .ok_or(InvalidHttpRequestError())?
             .split(" ")
             .collect();
 
-        if first_line.len() < 3 {
-            return Err(InvalidHttpRequestError());
-        }
+        let method = Request::create_method(&first_header_line)?;
+        let url = Request::create_url(&first_header_line)?;
+        let http_version = Request::create_http_version(&first_header_line)?;
+        let header = Request::create_header(&header_lines)?;
 
-        let (method, url, http_version) = (
-            *first_line.get(0).ok_or(InvalidHttpRequestError())?,
-            *first_line.get(1).ok_or(InvalidHttpRequestError())?,
-            *first_line.get(2).ok_or(InvalidHttpRequestError())?,
-        );
-
-        request.method = Method::from_str(method)?;
-        request.url = URL::from_str(url).map_err(|_| InvalidHttpRequestError())?;
-        request.http_version =
-            Version::from_str(http_version).map_err(|_| InvalidHttpRequestError())?;
-
-        Ok(request)
+        Ok(Request::new(method, url, http_version, header))
     }
 }
