@@ -1,9 +1,13 @@
+extern crate ctrlc;
+
 use nix::sys::socket::{
     accept, bind, listen, recvfrom, send, shutdown, socket, AddressFamily, InetAddr, IpAddr,
     MsgFlags, Shutdown, SockAddr, SockFlag, SockProtocol, SockType,
 };
+use std::{io, process::exit};
 
-use std::io;
+use std::sync::{mpsc, Arc, Mutex};
+
 pub struct Socket {
     fd: i32,
 }
@@ -75,11 +79,30 @@ impl Drop for Socket {
 
 pub struct Connections<'a> {
     listener: &'a Socket,
+    open: bool,
 }
 
 impl<'a> Connections<'a> {
     pub fn new(listener: &'a Socket) -> Self {
-        Connections { listener }
+        let connections = Arc::new(Mutex::new(Connections {
+            listener,
+            open: true,
+        }));
+
+        let clone = Arc::clone(&connections);
+
+        ctrlc::set_handler(move || {
+            let mut clone = clone.lock().unwrap();
+            clone.open = false;
+            println!("caught!");
+            exit(0);
+        })
+        .expect("Error setting Ctrl-C handler");
+
+        Connections {
+            listener,
+            open: true,
+        }
     }
 }
 
@@ -87,7 +110,11 @@ impl<'a> Iterator for Connections<'a> {
     type Item = Socket;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.listener.accept().ok()
+        if self.open {
+            self.listener.accept().ok()
+        } else {
+            None
+        }
     }
 }
 

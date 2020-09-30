@@ -1,6 +1,5 @@
-extern crate ctrlc;
-use server_from_scratch::{http_request::Request, listen_and_serve};
-use std::{io, process::exit, str};
+use server_from_scratch::net::{http_request::Request, http_server::HttpServer};
+use std::{io, str};
 
 const RES: &str = "\
 HTTP/1.1 200 OK\r\n\
@@ -16,12 +15,8 @@ Content-Type: text/html; charset=UTF-8\r\n\r\n\
 </html>\r\n\r\n";
 
 fn main() -> io::Result<()> {
-    // ctrlc::set_handler(move || {
-    //     println!("caught!");
-    //     exit(0);
-    // }).expect("Error setting Ctrl-C handler");
-
-    listen_and_serve(8080, handler)
+    let mut server = HttpServer::new(8081)?;
+    server.listen_and_serve(handler)
 }
 
 fn handler(req: Request) -> Vec<u8> {
