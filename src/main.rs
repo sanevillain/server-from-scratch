@@ -1,5 +1,5 @@
-use server_from_scratch::net::{http_request::Request, http_server::HttpServer};
-use std::{io, str};
+use server_from_scratch::net::{http_request::Request, http_server::HttpServer, file_server};
+use std::{fs, io, io::prelude::*, path::Path, str};
 
 const RES: &str = "\
 HTTP/1.1 200 OK\r\n\
@@ -15,11 +15,18 @@ Content-Type: text/html; charset=UTF-8\r\n\r\n\
 </html>\r\n\r\n";
 
 fn main() -> io::Result<()> {
-    let mut server = HttpServer::new(8081)?;
-    server.listen_and_serve(handler)
+    let server = HttpServer::new(8080)?;
+
+    let handler = file_server::FileServer::new("./src");
+
+    server.listen_and_serve(handler)?;
+
+
+
+    Ok(())
 }
 
-fn handler(req: Request) -> Vec<u8> {
-    println!("Req: {:?}", req);
-    RES.as_bytes().to_owned()
-}
+// fn handler(req: Request) -> io::Result<Vec<u8>> {
+//     println!("Req: {:?}", req);
+//     Ok(RES.as_bytes().to_owned())
+// }

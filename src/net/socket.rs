@@ -1,12 +1,13 @@
-extern crate ctrlc;
-
-use nix::sys::socket::{
-    accept, bind, listen, recvfrom, send, shutdown, socket, AddressFamily, InetAddr, IpAddr,
-    MsgFlags, Shutdown, SockAddr, SockFlag, SockProtocol, SockType,
+use nix::{
+    sys::socket::{
+        accept, bind, listen, recvfrom, send, setsockopt, socket, sockopt::ReuseAddr,
+        AddressFamily, InetAddr, IpAddr, MsgFlags, SockAddr, SockFlag, SockProtocol,
+        SockType,
+    },
+    unistd::close,
 };
-use std::{io, process::exit};
 
-use std::sync::{mpsc, Arc, Mutex};
+use std::io;
 
 pub struct Socket {
     fd: i32,
@@ -21,6 +22,9 @@ impl Socket {
             SockProtocol::Tcp,
         )
         .map_err(|err| nix_to_io_error(err, "Socket Allocation Error!"))?;
+
+        setsockopt(fd, ReuseAddr, &true)
+            .map_err(|err| nix_to_io_error(err, "Socket Allocation Options Error!"))?;
 
         Ok(Socket { fd })
     }
@@ -58,8 +62,7 @@ impl Socket {
     }
 
     pub fn shutdown(&self) -> io::Result<()> {
-        shutdown(self.fd, Shutdown::Both)
-            .map_err(|err| nix_to_io_error(err, "Socket Shutdown Error!"))?;
+        close(self.fd).map_err(|err| nix_to_io_error(err, "Socket Shutdown Error!"))?;
         Ok(())
     }
 
@@ -72,37 +75,18 @@ impl Drop for Socket {
     fn drop(&mut self) {
         match self.shutdown() {
             Ok(_) => println!("Connection closed for: {}.", self.fd),
-            Err(_) => println!("Coudln't close connection for: {}.", self.fd),
+            Err(e) => println!("Coudln't close connection for: {}. {:?}", self.fd, e),
         }
     }
 }
 
 pub struct Connections<'a> {
     listener: &'a Socket,
-    open: bool,
 }
 
 impl<'a> Connections<'a> {
     pub fn new(listener: &'a Socket) -> Self {
-        let connections = Arc::new(Mutex::new(Connections {
-            listener,
-            open: true,
-        }));
-
-        let clone = Arc::clone(&connections);
-
-        ctrlc::set_handler(move || {
-            let mut clone = clone.lock().unwrap();
-            clone.open = false;
-            println!("caught!");
-            exit(0);
-        })
-        .expect("Error setting Ctrl-C handler");
-
-        Connections {
-            listener,
-            open: true,
-        }
+        Self { listener }
     }
 }
 
@@ -110,11 +94,7 @@ impl<'a> Iterator for Connections<'a> {
     type Item = Socket;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.open {
-            self.listener.accept().ok()
-        } else {
-            None
-        }
+        self.listener.accept().ok()
     }
 }
 

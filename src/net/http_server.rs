@@ -5,14 +5,14 @@ use std::{
 };
 
 pub trait Handler: Clone + Send + Sync + 'static {
-    fn serve_http(&self, req: Request) -> Vec<u8>;
+    fn serve_http(&self, req: Request) -> io::Result<Vec<u8>>;
 }
 
 impl<F> Handler for F
 where
-    F: Fn(Request) -> Vec<u8> + Clone + Send + Sync + 'static,
+    F: Fn(Request) -> io::Result<Vec<u8>> + Clone + Send + Sync + 'static,
 {
-    fn serve_http(&self, req: Request) -> Vec<u8> {
+    fn serve_http(&self, req: Request) -> io::Result<Vec<u8>> {
         self(req)
     }
 }
@@ -37,34 +37,32 @@ impl HttpServer {
         self.socket.listen(128)?;
         println!("Server started on port: {}", self.port);
 
-        for client_socket in self.socket.incoming().take(2) {
+        for client_socket in self.socket.incoming() {
             let handler = handler.clone();
 
-            self.pool.execute(move || {
+            self.pool.execute(move || -> io::Result<()> {
                 let read_buffer = &mut [0; 30000];
                 client_socket.receive(read_buffer).unwrap();
 
                 let req_str = str::from_utf8(read_buffer).unwrap();
                 let req = Request::from_str(req_str).unwrap();
 
-                if req.url.path == "/" {
-                    let res = handler.serve_http(req);
-                    client_socket.send(&res).unwrap();
-                } else {
-                    client_socket
-                        .send("HTTP/1.1 404 NOT FOUND\r\n\r\n".as_bytes())
-                        .unwrap();
-                }
+                let res = handler.serve_http(req)?;
+                client_socket.send(&res).unwrap();
+
+                // if req.url.path == "/" {
+                //     let res = handler.serve_http(req)?;
+                //     client_socket.send(&res).unwrap();
+                // } else {
+                //     client_socket
+                //         .send("HTTP/1.1 404 NOT FOUND\r\n\r\n".as_bytes())
+                //         .unwrap();
+                // }
+
+                Ok(())
             });
         }
 
-        println!("Shutting down server on port: {}", self.port);
         Ok(())
     }
 }
-
-// impl Drop for HttpServer {
-//     fn drop(&mut self) {
-//         drop(&self.pool);
-//     }
-// }
