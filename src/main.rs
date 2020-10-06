@@ -1,4 +1,4 @@
-use server_from_scratch::net::{http_request::Request, http_server::HttpServer, file_server};
+use server_from_scratch::http::{request::Request, server::HttpServer, file_server};
 use std::{fs, io, io::prelude::*, path::Path, str};
 
 const RES: &str = "\

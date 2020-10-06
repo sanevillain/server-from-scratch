@@ -1,4 +1,4 @@
-use super::{http_request::Request, socket::Socket, thread_pool::ThreadPool};
+use super::{request::Request, socket::Socket, thread_pool::ThreadPool};
 use std::{
     io,
     str::{self, FromStr},

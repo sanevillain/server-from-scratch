@@ -1,19 +1,5 @@
-use super::http_request::Request;
-use super::http_server::Handler;
+use super::{request::Request, server::Handler};
 use std::{fs, io, path::Path, str};
-
-const TEMPLATE: &str = "\
-HTTP/1.1 200 OK\r\n\
-Content-Type: text/html; charset=UTF-8\r\n\r\n\
-<!DOCTYPE html>\
-<html>\
-    <head>\
-        <title>Hello</title>\
-    </head>\
-    <body>\
-        {{ }}
-    </body>\
-</html>\r\n\r\n";
 
 #[derive(Clone)]
 pub struct FileServer {
@@ -26,24 +12,20 @@ impl FileServer {
     }
 
     fn build_page(path: String, filenames: Vec<String>) -> String {
+        const FIRST_HALF: &str = "<!DOCTYPE html><html><head><title>Hello</title></head><body>";
+        const SECOND_HALF: &str = "</body></html>\r\n\r\n";
+
         let mut page: Vec<String> = vec![];
 
-        let ul_list = FileServer::build_ul_list(path, filenames);
-        let halves: Vec<_> = TEMPLATE.split("{{ }}").collect();
-
-        halves.iter().enumerate().for_each(|(i, half)| {
-            if i == (halves.len() - 1) {
-                page.extend(ul_list.clone().into_iter());
-            }
-
-            page.push(half.to_string());
-        });
-
+        page.push(FIRST_HALF.to_string());
+        page.extend(FileServer::build_body(path, filenames));
+        page.push(SECOND_HALF.to_string());
         page.join("")
     }
 
-    fn build_ul_list(path: String, filenames: Vec<String>) -> Vec<String> {
+    fn build_body(path: String, filenames: Vec<String>) -> Vec<String> {
         let mut list = vec![];
+        list.push(format!("<h3>{}</h3>", path));
         list.push(String::from("<ul>"));
         list.extend(filenames.iter().map(|filename| {
             format!(
