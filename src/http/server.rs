@@ -39,7 +39,6 @@ impl HttpServer {
             let handler = handler.clone();
 
             self.pool.execute(move || -> io::Result<()> {
-                // let mut read_buffer = vec![];
                 let read_buffer = &mut [0; 30000];
                 client_socket
                     .receive(read_buffer)

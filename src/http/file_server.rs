@@ -110,8 +110,12 @@ impl Handler for FileServer {
 
         if path.is_file() {
             if let Ok(file) = fs::read(path) {
+                let content_type = mime_guess::from_path(path)
+                    .first_raw()
+                    .unwrap_or("text/plain");
+
                 let res = Response::builder()
-                    .header("Content-Type", "text")
+                    .header("Content-Type", content_type)
                     .body(file)
                     .into();
 
