@@ -36,7 +36,7 @@ impl ThreadPool {
         F: FnOnce() -> io::Result<()> + Send + 'static,
     {
         let job = Box::new(f);
-        self.sender.send(Message::NewJob(job)).unwrap();
+        self.sender.send(Message::NewJob(job)).expect("Error sending new job message");
     }
 }
 
@@ -44,7 +44,7 @@ impl Drop for ThreadPool {
     fn drop(&mut self) {
         println!("Sending terminate message to all workers.");
         for _ in &self.workers {
-            self.sender.send(Message::Terminate).unwrap();
+            self.sender.send(Message::Terminate).expect("Error sending terminate message");
         }
 
         println!("Shutting down all workers.");

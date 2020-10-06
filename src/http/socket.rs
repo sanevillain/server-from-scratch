@@ -1,8 +1,7 @@
 use nix::{
     sys::socket::{
         accept, bind, listen, recvfrom, send, setsockopt, socket, sockopt::ReuseAddr,
-        AddressFamily, InetAddr, IpAddr, MsgFlags, SockAddr, SockFlag, SockProtocol,
-        SockType,
+        AddressFamily, InetAddr, IpAddr, MsgFlags, SockAddr, SockFlag, SockProtocol, SockType,
     },
     unistd::close,
 };

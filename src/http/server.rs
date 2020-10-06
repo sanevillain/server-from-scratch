@@ -1,18 +1,18 @@
-use super::{request::Request, socket::Socket, thread_pool::ThreadPool};
+use super::{request::Request, response::Response, socket::Socket, thread_pool::ThreadPool};
 use std::{
     io,
     str::{self, FromStr},
 };
 
 pub trait Handler: Clone + Send + Sync + 'static {
-    fn serve_http(&self, req: Request) -> io::Result<Vec<u8>>;
+    fn serve_http(&self, req: Request) -> io::Result<Response>;
 }
 
 impl<F> Handler for F
 where
-    F: Fn(Request) -> io::Result<Vec<u8>> + Clone + Send + Sync + 'static,
+    F: Fn(Request) -> io::Result<Response> + Clone + Send + Sync + 'static,
 {
-    fn serve_http(&self, req: Request) -> io::Result<Vec<u8>> {
+    fn serve_http(&self, req: Request) -> io::Result<Response> {
         self(req)
     }
 }
@@ -41,23 +41,19 @@ impl HttpServer {
             let handler = handler.clone();
 
             self.pool.execute(move || -> io::Result<()> {
+                // let mut read_buffer = vec![];
                 let read_buffer = &mut [0; 30000];
-                client_socket.receive(read_buffer).unwrap();
+                client_socket
+                    .receive(read_buffer)
+                    .expect("Clinet Socket receive");
 
-                let req_str = str::from_utf8(read_buffer).unwrap();
-                let req = Request::from_str(req_str).unwrap();
+                let req_str = String::from_utf8_lossy(read_buffer);
+                let req = Request::from_str(&req_str).expect("Request build error");
 
                 let res = handler.serve_http(req)?;
-                client_socket.send(&res).unwrap();
-
-                // if req.url.path == "/" {
-                //     let res = handler.serve_http(req)?;
-                //     client_socket.send(&res).unwrap();
-                // } else {
-                //     client_socket
-                //         .send("HTTP/1.1 404 NOT FOUND\r\n\r\n".as_bytes())
-                //         .unwrap();
-                // }
+                client_socket
+                    .send(&res.to_bytes())
+                    .expect("Request send error");
 
                 Ok(())
             });
