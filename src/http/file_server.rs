@@ -31,20 +31,19 @@ impl FileServer {
     ) -> Vec<String> {
         let mut list = vec![];
 
-        println!("FileNames: {:?} {}", filenames, path);
-
         list.push(format!("<h3>{}</h3>", path));
-        list.push(format!(
-            "<a href=\"{}\">Back</a>",
-            if previous_path == "" {
-                "/".to_string()
-            } else {
-                previous_path
-            }
-        ));
-        list.push(String::from("<ul>"));
-        list.extend(filenames.iter().map(|filename| {
-            format!(
+        list.push(format!("<a href=\"{}\">Back</a>", previous_path));
+        list.extend(self.build_ul(path, filenames));
+
+        list
+    }
+
+    fn build_ul(&self, path: String, filenames: Vec<String>) -> Vec<String> {
+        let mut list = vec![];
+
+        list.push("<ul>".to_string());
+        filenames.iter().for_each(|filename| {
+            let li = format!(
                 "<li><a href=\"{}{}\">{}</a></li>",
                 if path != "/" {
                     path.to_string()
@@ -53,68 +52,87 @@ impl FileServer {
                 },
                 filename,
                 filename
-            )
-        }));
-        list.push(String::from("</ul>"));
+            );
+
+            list.push(li);
+        });
+        list.push("</ul>".to_string());
+
         list
+    }
+}
+
+impl FileServer {
+    fn get_parent_path(&self, parenth_path: &Path) -> String {
+        let parent_path_str = parenth_path.to_str().unwrap_or("").to_string();
+
+        if parenth_path.starts_with(self.path) {
+            let parenth_path = parent_path_str
+                .strip_prefix(self.path)
+                .expect("Couldn't trim previous path")
+                .to_string();
+
+            if !parenth_path.is_empty() {
+                return parenth_path;
+            }
+        }
+
+        "/".to_string()
+    }
+
+    fn get_filenames(&self, path: &Path) -> io::Result<Vec<String>> {
+        let links = fs::read_dir(path)?
+            .filter_map(|entry| match entry {
+                Ok(entry) => Some(entry),
+                _ => None,
+            })
+            .map(|entry| {
+                entry
+                    .path()
+                    .file_name()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_string()
+            })
+            .map(|filename| format!("/{}", filename))
+            .collect::<Vec<String>>();
+
+        Ok(links)
     }
 }
 
 impl Handler for FileServer {
     fn serve_http(&self, req: Request) -> io::Result<Response> {
-        let p = format!("{}{}", self.path, req.url.path);
-        let path = Path::new(&p);
+        let req_url = req.url.path.to_string();
+        let file_path = format!("{}{}", self.path, req.url.path);
+        let path = Path::new(&file_path);
 
         if path.is_file() {
             if let Ok(file) = fs::read(path) {
-                return Ok(Response::builder()
+                let res = Response::builder()
                     .header("Content-Type", "text")
                     .body(file)
-                    .into());
+                    .into();
+
+                return Ok(res);
             }
+        } else if path.is_dir() {
+            let links = self.get_filenames(path)?;
+            let parent_path = self.get_parent_path(path.parent().unwrap());
+            let body = self.build_page(req_url, parent_path, links).into_bytes();
+            let res = Response::builder().body(body).into();
+
+            return Ok(res);
         }
 
-        if !path.is_dir() {
-            let not_found = "<!DOCTYPE html><html><head><title>Hello</title></head><body><h1>404 Content Not Found</body></html>\r\n\r\n";
+        let not_found = "<!DOCTYPE html><html><head><title>Hello</title></head><body><h1>404 Content Not Found</body></html>\r\n\r\n";
+        let res = Response::builder()
+            .header("Content-Type", "text/html")
+            .status(Status::NotFound)
+            .body(not_found.to_string().into_bytes())
+            .into();
 
-            return Ok(Response::builder()
-                .header("Content-Type", "text/html")
-                .body(String::from(not_found).into_bytes())
-                .status(Status::NotFound)
-                .into());
-        }
-
-        let links = fs::read_dir(path)?
-            .filter_map(|entry| match entry {
-                Ok(entry) => Some(
-                    entry
-                        .path()
-                        .file_name()
-                        .unwrap()
-                        .to_str()
-                        .unwrap()
-                        .to_owned(),
-                ),
-                _ => None,
-            })
-            .map(|filename| format!("/{}", filename))
-            .collect::<Vec<String>>();
-
-        let mut previous_path = path.parent().unwrap().to_str().unwrap().to_string();
-
-        if previous_path.starts_with(self.path) {
-            previous_path = previous_path
-                .strip_prefix(self.path)
-                .expect("Couldn't trim previous path")
-                .to_string();
-        } else {
-            previous_path = "/".to_string();
-        }
-
-        let body = self
-            .build_page(req.url.path.to_string(), previous_path, links)
-            .into_bytes();
-
-        Ok(Response::builder().body(body).into())
+        Ok(res)
     }
 }

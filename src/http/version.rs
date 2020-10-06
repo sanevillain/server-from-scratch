@@ -29,7 +29,6 @@ impl ToString for Version {
     fn to_string(&self) -> String {
         match self {
             Version::V1P1 => String::from("HTTP/1.1"),
-            _ => String::from(""),
         }
     }
 }

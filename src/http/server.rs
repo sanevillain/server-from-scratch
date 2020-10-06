@@ -1,8 +1,6 @@
-use super::{request::Request, response::Response, socket::Socket, thread_pool::ThreadPool};
-use std::{
-    io,
-    str::{self, FromStr},
-};
+use super::{request::Request, response::Response, thread_pool::ThreadPool};
+use crate::net::socket::Socket;
+use std::{io, str::FromStr};
 
 pub trait Handler: Clone + Send + Sync + 'static {
     fn serve_http(&self, req: Request) -> io::Result<Response>;
