@@ -60,30 +60,28 @@ impl Header {
 }
 
 impl Header {
-    pub fn create_from_lines(lines: Vec<&str>) -> Result<Header, Error> {
+    pub fn from_lines(lines: Vec<&str>) -> Result<Header, Error> {
         let mut header = Header::new();
 
-        for line in lines {
-            let line = line.trim();
+        for line in lines.iter().filter(|l| l.contains(":")) {
+            let (key, values) = Header::parse_key_values_line(line.trim())?;
 
-            if !line.trim().is_empty() {
-                let (key, values) = Header::parse_key_values_line(line)?;
-
-                for val in values.split(",") {
-                    header.add(&key, val.trim());
-                }
-            }
+            values
+                .split(",")
+                .for_each(|val| header.add(&key, val.trim()));
         }
 
         Ok(header)
     }
 
     fn parse_key_values_line(line: &str) -> Result<(String, String), Error> {
-        if !line.is_empty() && line.contains(":") {
-            Ok((
+        if line.contains(":") && line.contains(" ") {
+            let key_values = (
                 line.chars().take_while(|c| *c != ':').collect(),
                 line.chars().skip_while(|c| *c != ' ').collect(),
-            ))
+            );
+
+            Ok(key_values)
         } else {
             Err(Error::new(
                 ErrorKind::InvalidData,
@@ -92,18 +90,20 @@ impl Header {
         }
     }
 
-    fn line_from_key_and_values(key: &str, values: Vec<String>) -> String {
-        let mut line = format!("{}: ", key);
+    fn create_key_values_line(key: &str, values: Vec<String>) -> String {
+        let values = values
+            .iter()
+            .enumerate()
+            .map(|(i, val)| {
+                if i < values.len() - 1 {
+                    format!("{}, ", val)
+                } else {
+                    format!("{}\r\n", val)
+                }
+            })
+            .collect::<Vec<String>>();
 
-        for (i, val) in values.iter().enumerate() {
-            if i == values.len() - 1 {
-                line += &format!("{}\r\n", val);
-            } else {
-                line += &format!("{}, ", val);
-            }
-        }
-
-        line
+        format!("{}: {}", key, values.join(""))
     }
 }
 
@@ -117,21 +117,22 @@ impl FromStr for Header {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Header::create_from_lines(s.split("\r\n").filter(|l| l.contains(":")).collect())
+        Header::from_lines(s.split("\r\n").collect())
     }
 }
 
 impl ToString for Header {
     fn to_string(&self) -> String {
-        let mut lines = "".to_string();
+        let key_val_lines = self
+            .ordered_keys
+            .iter()
+            .map(|key| {
+                let values = self.values(key).unwrap();
+                Header::create_key_values_line(key, values)
+            })
+            .collect::<Vec<String>>();
 
-        for key in self.ordered_keys.iter() {
-            let values = self.values(key).unwrap();
-            let line = Header::line_from_key_and_values(key, values);
-            lines += &line;
-        }
-
-        format!("{}\r\n", lines)
+        format!("{}\r\n", key_val_lines.join(""))
     }
 }
 

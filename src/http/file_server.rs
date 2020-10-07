@@ -16,8 +16,10 @@ impl FileServer {
     fn html_template(body: String) -> String {
         format!(
             "<!DOCTYPE html>\
-            <html>\
+            <html lang=\"en\">\
             <head>\
+                <meta charset=\"UTF-8\">\
+                <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\
                 <title>Hello</title>\
             </head>\
             <body>{}</body>\
@@ -111,7 +113,7 @@ impl Handler for FileServer {
             let html_page = FileServer::html_template(html_body).into_bytes();
 
             let res = Response::builder()
-                .header("Content-Type", "text/html")
+                .header("Content-Type", "text/html; charset=utf-8")
                 .header("Content-Length", &html_page.len().to_string())
                 .body(html_page)
                 .into();
@@ -124,7 +126,7 @@ impl Handler for FileServer {
 
         let res = Response::builder()
             .status(Status::NotFound)
-            .header("Content-Type", "text/html")
+            .header("Content-Type", "text/html; charset=utf-8")
             .header("Content-Length", &html_not_found_page.len().to_string())
             .body(html_not_found_page)
             .into();

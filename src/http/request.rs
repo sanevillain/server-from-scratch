@@ -1,4 +1,4 @@
-use super::{header::Header, version::Version, url::URL};
+use super::{body::Body, header::Header, url::URL, version::Version};
 use std::{default::Default, error::Error, fmt, str::FromStr};
 
 #[derive(Debug)]
@@ -56,22 +56,30 @@ pub struct Request {
     pub url: URL,
     pub http_version: Version,
     pub header: Header,
+    pub body: Body,
 }
 
 impl Request {
-    pub fn new(method: Method, url: URL, http_version: Version, header: Header) -> Self {
+    pub fn new(
+        method: Method,
+        url: URL,
+        http_version: Version,
+        header: Header,
+        body: Body,
+    ) -> Self {
         Request {
             method,
             url,
             http_version,
             header,
+            body,
         }
     }
 }
 
 impl Request {
-    fn create_header(headers: &str) -> Result<Header, InvalidHttpRequestError> {
-        Header::from_str(headers).map_err(|_| InvalidHttpRequestError())
+    fn create_header(header_lines: Vec<&str>) -> Result<Header, InvalidHttpRequestError> {
+        Header::from_lines(header_lines).map_err(|_| InvalidHttpRequestError())
     }
 
     fn create_method(first_header_line: &Vec<&str>) -> Result<Method, InvalidHttpRequestError> {
@@ -90,27 +98,40 @@ impl Request {
         let http_version = *first_header_line.get(2).ok_or(InvalidHttpRequestError())?;
         Version::from_str(http_version).map_err(|_| InvalidHttpRequestError())
     }
+
+    fn create_body(body: &str) -> Result<Body, InvalidHttpRequestError> {
+        Body::from_str(body).map_err(|_| InvalidHttpRequestError())
+    }
 }
 
 impl FromStr for Request {
     type Err = InvalidHttpRequestError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let headers_and_body: Vec<_> = s.split("\r\n\r\n").collect();
-        let headers = headers_and_body.first().ok_or(InvalidHttpRequestError())?;
+        let headers_and_body = s.split("\r\n\r\n").collect::<Vec<&str>>();
 
-        let header_lines: Vec<_> = headers.split("\r\n").collect();
-        let first_header_line: Vec<_> = header_lines
+        let (headers, body) = (
+            headers_and_body.first().ok_or(InvalidHttpRequestError())?,
+            headers_and_body.last().ok_or(InvalidHttpRequestError())?,
+        );
+
+        let header_lines = headers.split("\r\n").collect::<Vec<&str>>();
+        let first_header_line = header_lines
             .first()
             .ok_or(InvalidHttpRequestError())?
             .split(" ")
-            .collect();
+            .collect::<Vec<&str>>();
 
-        let method = Request::create_method(&first_header_line)?;
-        let url = Request::create_url(&first_header_line)?;
-        let http_version = Request::create_http_version(&first_header_line)?;
-        let header = Request::create_header(headers)?;
+        let (method, url, http_version, header, body) = (
+            Request::create_method(&first_header_line)?,
+            Request::create_url(&first_header_line)?,
+            Request::create_http_version(&first_header_line)?,
+            Request::create_header(header_lines)?,
+            Request::create_body(body)?,
+        );
 
-        Ok(Request::new(method, url, http_version, header))
+        let req = Request::new(method, url, http_version, header, body);
+
+        Ok(req)
     }
 }

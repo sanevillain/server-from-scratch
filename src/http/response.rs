@@ -1,4 +1,4 @@
-use super::{header::Header, status::Status, version::Version};
+use super::{body::Body, header::Header, status::Status, version::Version};
 use std::path::Path;
 
 #[derive(Default)]
@@ -6,7 +6,7 @@ pub struct Response {
     pub http_version: Version,
     pub status: Status,
     pub header: Header,
-    pub body: Vec<u8>,
+    pub body: Body,
 }
 
 impl Response {
@@ -26,7 +26,7 @@ impl Response {
 
     pub fn to_bytes(self) -> Vec<u8> {
         let mut res = self.build_headers_string().into_bytes();
-        res.extend(self.body);
+        res.extend(self.body.get());
         res
     }
 }
@@ -46,7 +46,7 @@ impl ResponseBuilder {
     }
 
     pub fn body(mut self, body: Vec<u8>) -> Self {
-        self.0.body = body;
+        self.0.body = Body::new(body);
         self
     }
 
@@ -63,7 +63,7 @@ impl ResponseBuilder {
         self.0.header.add("Content-Type", content_type);
         self.0.header.add("Content-Length", &body.len().to_string());
 
-        self.0.body = body;
+        self.0.body = Body::new(body);
         self
     }
 }

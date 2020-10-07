@@ -7,5 +7,6 @@ fn main() -> io::Result<()> {
     let server = HttpServer::new(8080)?;
     let handler = file_server::FileServer::new("/Users/doom/Downloads");
     server.listen_and_serve(handler)?;
+
     Ok(())
 }
