@@ -10,55 +10,41 @@ impl FileServer {
     pub fn new(path: &'static str) -> Self {
         Self { path }
     }
+}
 
-    fn build_page(&self, path: String, previous_path: String, filenames: Vec<String>) -> String {
-        const FIRST_HALF: &str = "<!DOCTYPE html><html><head><title>Hello</title></head><body>";
-        const SECOND_HALF: &str = "</body></html>\r\n\r\n";
-
-        let mut page: Vec<String> = vec![];
-
-        page.push(FIRST_HALF.to_string());
-        page.extend(self.build_body(path, previous_path, filenames));
-        page.push(SECOND_HALF.to_string());
-        page.join("")
+impl FileServer {
+    fn html_template(body: String) -> String {
+        format!(
+            "<!DOCTYPE html>\
+            <html>\
+            <head>\
+                <title>Hello</title>\
+            </head>\
+            <body>{}</body>\
+            </html>\r\n\r\n",
+            body
+        )
     }
 
-    fn build_body(
-        &self,
-        path: String,
-        previous_path: String,
-        filenames: Vec<String>,
-    ) -> Vec<String> {
-        let mut list = vec![];
+    fn build_body(path: String, previous_path: String, filenames: Vec<String>) -> String {
+        let mut path = &path[..];
+        if path == "/" {
+            path = "";
+        }
 
-        list.push(format!("<h3>{}</h3>", path));
-        list.push(format!("<a href=\"{}\">Back</a>", previous_path));
-        list.extend(self.build_ul(path, filenames));
+        let lis = filenames
+            .iter()
+            .map(|filename| format!("<li><a href=\"{}{}\">{}</a></li>", path, filename, filename))
+            .collect::<Vec<String>>();
 
-        list
-    }
-
-    fn build_ul(&self, path: String, filenames: Vec<String>) -> Vec<String> {
-        let mut list = vec![];
-
-        list.push("<ul>".to_string());
-        filenames.iter().for_each(|filename| {
-            let li = format!(
-                "<li><a href=\"{}{}\">{}</a></li>",
-                if path != "/" {
-                    path.to_string()
-                } else {
-                    "".to_string()
-                },
-                filename,
-                filename
-            );
-
-            list.push(li);
-        });
-        list.push("</ul>".to_string());
-
-        list
+        format!(
+            "<h3>{}</h3>\
+            <a href=\"{}\">Back</a>\
+            <ul>{}</ul>",
+            path,
+            previous_path,
+            lis.join("")
+        )
     }
 }
 
@@ -66,7 +52,7 @@ impl FileServer {
     fn get_parent_path(&self, parenth_path: &Path) -> String {
         let parent_path_str = parenth_path.to_str().unwrap_or("").to_string();
 
-        if parenth_path.starts_with(self.path) {
+        if parent_path_str.starts_with(self.path) {
             let parenth_path = parent_path_str
                 .strip_prefix(self.path)
                 .expect("Couldn't trim previous path")
@@ -110,31 +96,37 @@ impl Handler for FileServer {
 
         if path.is_file() {
             if let Ok(file) = fs::read(path) {
-                let content_type = mime_guess::from_path(path)
-                    .first_raw()
-                    .unwrap_or("text/plain");
-
                 let res = Response::builder()
-                    .header("Content-Type", content_type)
-                    .body(file)
+                    .body_with_content_type_and_length(path, file)
                     .into();
 
                 return Ok(res);
             }
-        } else if path.is_dir() {
+        }
+
+        if path.is_dir() {
             let links = self.get_filenames(path)?;
             let parent_path = self.get_parent_path(path.parent().unwrap());
-            let body = self.build_page(req_url, parent_path, links).into_bytes();
-            let res = Response::builder().body(body).into();
+            let html_body = FileServer::build_body(req_url, parent_path, links);
+            let html_page = FileServer::html_template(html_body).into_bytes();
+
+            let res = Response::builder()
+                .header("Content-Type", "text/html")
+                .header("Content-Length", &html_page.len().to_string())
+                .body(html_page)
+                .into();
 
             return Ok(res);
         }
 
-        let not_found = "<!DOCTYPE html><html><head><title>Hello</title></head><body><h1>404 Content Not Found</body></html>\r\n\r\n";
+        let html_not_found_page =
+            FileServer::html_template("<h1>404 Content Not Found</h1>".to_string()).into_bytes();
+
         let res = Response::builder()
-            .header("Content-Type", "text/html")
             .status(Status::NotFound)
-            .body(not_found.to_string().into_bytes())
+            .header("Content-Type", "text/html")
+            .header("Content-Length", &html_not_found_page.len().to_string())
+            .body(html_not_found_page)
             .into();
 
         Ok(res)

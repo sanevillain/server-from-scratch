@@ -36,20 +36,24 @@ impl ThreadPool {
         F: FnOnce() -> io::Result<()> + Send + 'static,
     {
         let job = Box::new(f);
-        self.sender.send(Message::NewJob(job)).expect("Error sending new job message");
+        self.sender
+            .send(Message::NewJob(job))
+            .expect("Error sending new job message");
     }
 }
 
 impl Drop for ThreadPool {
     fn drop(&mut self) {
-        println!("Sending terminate message to all workers.");
+        debug!("Sending terminate message to all workers.");
         for _ in &self.workers {
-            self.sender.send(Message::Terminate).expect("Error sending terminate message");
+            self.sender
+                .send(Message::Terminate)
+                .expect("Error sending terminate message");
         }
 
-        println!("Shutting down all workers.");
+        debug!("Shutting down all workers.");
         for worker in &mut self.workers {
-            println!("Shutting down worker {}", worker.id);
+            debug!("Shutting down worker {}", worker.id);
             if let Some(thread) = worker.thread.take() {
                 thread.join().unwrap();
             }
@@ -69,11 +73,14 @@ impl Worker {
 
             match message {
                 Message::NewJob(job) => {
-                    println!("Worker {} got a job; executing.", id);
-                    job();
+                    debug!("Worker {} got a job; executing.", id);
+                    match job() {
+                        Err(e) => error!("Worker {} got an error {}", id, e),
+                        Ok(()) => debug!("Worker {} finsihed job successfully", id),
+                    }
                 }
                 Message::Terminate => {
-                    println!("Worker {} was told to terminate.", id);
+                    debug!("Worker {} was told to terminate.", id);
                     break;
                 }
             }

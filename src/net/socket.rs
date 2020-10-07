@@ -24,7 +24,7 @@ impl Socket {
 
         setsockopt(fd, ReuseAddr, &true)
             .map_err(|err| nix_to_io_error(err, "Socket Allocation Options Error!"))?;
-
+        debug!("New Socket {} created.", fd);
         Ok(Socket { fd })
     }
 
@@ -34,29 +34,33 @@ impl Socket {
         let socket_addr = &SockAddr::new_inet(inet_addr);
 
         bind(self.fd, socket_addr).map_err(|err| nix_to_io_error(err, "Socket Bind Error!"))?;
+        debug!("Socket {} bound.", self.fd);
         Ok(())
     }
 
     pub fn listen(&self, backlog: usize) -> io::Result<()> {
         listen(self.fd, backlog).map_err(|err| nix_to_io_error(err, "Socket Listen Error!"))?;
+        debug!("Socket {} listening.", self.fd);
         Ok(())
     }
 
     pub fn accept(&self) -> io::Result<Self> {
         let fd = accept(self.fd).map_err(|err| nix_to_io_error(err, "Socket Accept Error!"))?;
-
+        debug!("Socket {} accepted new Socket {}.", self.fd, fd);
         Ok(Socket { fd })
     }
 
     pub fn receive(&self, buf: &mut [u8]) -> io::Result<usize> {
         let (read_bytes, _) =
             recvfrom(self.fd, buf).map_err(|err| nix_to_io_error(err, "Socket Receive Error!"))?;
+        debug!("Reading from socket {}.", self.fd);
         Ok(read_bytes)
     }
 
     pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
         let sent_bytes = send(self.fd, buf, MsgFlags::empty())
             .map_err(|err| nix_to_io_error(err, "Socket Send Error!"))?;
+        debug!("Sending to socket {}.", self.fd);
         Ok(sent_bytes)
     }
 
@@ -73,8 +77,8 @@ impl Socket {
 impl Drop for Socket {
     fn drop(&mut self) {
         match self.shutdown() {
-            Ok(_) => println!("Connection closed for: {}.", self.fd),
-            Err(e) => println!("Coudln't close connection for: {}. {:?}", self.fd, e),
+            Ok(_) => debug!("Socket {} closed.", self.fd),
+            Err(e) => error!("Coudln't close socket {}. {:?}", self.fd, e),
         }
     }
 }

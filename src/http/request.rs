@@ -97,7 +97,6 @@ impl FromStr for Request {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let headers_and_body: Vec<_> = s.split("\r\n\r\n").collect();
-        println!("FROM STR - {}", s);
         let headers = headers_and_body.first().ok_or(InvalidHttpRequestError())?;
 
         let header_lines: Vec<_> = headers.split("\r\n").collect();

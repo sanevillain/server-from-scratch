@@ -1,4 +1,5 @@
 use super::{header::Header, status::Status, version::Version};
+use std::path::Path;
 
 #[derive(Default)]
 pub struct Response {
@@ -51,6 +52,18 @@ impl ResponseBuilder {
 
     pub fn header(mut self, key: &str, val: &str) -> Self {
         self.0.header.add(key, val);
+        self
+    }
+
+    pub fn body_with_content_type_and_length(mut self, path: &Path, body: Vec<u8>) -> Self {
+        let content_type = mime_guess::from_path(path)
+            .first_raw()
+            .unwrap_or("text/plain");
+
+        self.0.header.add("Content-Type", content_type);
+        self.0.header.add("Content-Length", &body.len().to_string());
+
+        self.0.body = body;
         self
     }
 }
