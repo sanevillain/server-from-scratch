@@ -66,7 +66,18 @@ impl Header {
         let mut header = Header::new();
 
         for line in lines.iter() {
-            let (key, values) = Header::parse_key_values_line(line.trim())?;
+            let line = line.trim();
+
+            if !line.contains(":") || !line.contains(" ") {
+                return Err(Error::new(ErrorKind::InvalidInput, "Invalid headers line!"));
+            }
+
+            let key = line.chars().take_while(|c| *c != ':').collect::<String>();
+            let values = line.chars().skip_while(|c| *c != ' ').collect::<String>();
+
+            if key.is_empty() || values.is_empty() {
+                return Err(Error::new(ErrorKind::InvalidInput, "Invalid headers line!"));
+            }
 
             values
                 .split(",")
@@ -74,35 +85,6 @@ impl Header {
         }
 
         Ok(header)
-    }
-
-    fn parse_key_values_line(line: &str) -> Result<(String, String), Error> {
-        if line.contains(":") && line.contains(" ") {
-            let key_values = (
-                line.chars().take_while(|c| *c != ':').collect(),
-                line.chars().skip_while(|c| *c != ' ').collect(),
-            );
-
-            Ok(key_values)
-        } else {
-            Err(Error::new(ErrorKind::InvalidInput, "Invalid headers line!"))
-        }
-    }
-
-    fn create_key_values_line(key: &str, values: Vec<String>) -> String {
-        let values = values
-            .iter()
-            .enumerate()
-            .map(|(i, val)| {
-                if i < values.len() - 1 {
-                    format!("{}, ", val)
-                } else {
-                    format!("{}\r\n", val)
-                }
-            })
-            .collect::<Vec<String>>();
-
-        format!("{}: {}", key, values.join(""))
     }
 }
 
@@ -166,16 +148,30 @@ impl FromStr for Header {
 
 impl ToString for Header {
     fn to_string(&self) -> String {
-        let key_val_lines = self
+        let build_key_values_line = |key: &str| -> String {
+            let values = self.values(key).unwrap();
+            let values = values
+                .iter()
+                .enumerate()
+                .map(|(i, val)| {
+                    if i < values.len() - 1 {
+                        format!("{}, ", val)
+                    } else {
+                        format!("{}\r\n", val)
+                    }
+                })
+                .collect::<Vec<String>>();
+
+            format!("{}: {}", key, values.join(""))
+        };
+
+        let lines = self
             .ordered_keys
             .iter()
-            .map(|key| {
-                let values = self.values(key).unwrap();
-                Header::create_key_values_line(key, values)
-            })
+            .map(|key| build_key_values_line(key))
             .collect::<Vec<String>>();
 
-        format!("{}\r\n", key_val_lines.join(""))
+        format!("{}\r\n", lines.join(""))
     }
 }
 
