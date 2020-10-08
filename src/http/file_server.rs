@@ -13,7 +13,7 @@ impl FileServer {
 }
 
 impl FileServer {
-    fn html_template(body: String) -> String {
+    fn html_template(&self, body: String) -> String {
         format!(
             "<!DOCTYPE html>\
             <html lang=\"en\">\
@@ -23,30 +23,30 @@ impl FileServer {
                 <title>Hello</title>\
             </head>\
             <body>{}</body>\
-            </html>\r\n\r\n",
+            </html>",
             body
         )
     }
 
-    fn build_body(path: String, previous_path: String, filenames: Vec<String>) -> String {
+    fn build_body(&self, path: String, previous_path: String, filenames: Vec<String>) -> String {
         let mut path = &path[..];
         if path == "/" {
             path = "";
         }
 
+        let header = format!("<h3>{}{}</h3>", self.path, path);
+        let back = if !path.is_empty() {
+            format!("<a href=\"{}\">Back</a>", previous_path)
+        } else {
+            format!("")
+        };
         let lis = filenames
             .iter()
             .map(|filename| format!("<li><a href=\"{}{}\">{}</a></li>", path, filename, filename))
             .collect::<Vec<String>>();
+        let ul = format!("<ul>{}</ul>", lis.join(""));
 
-        format!(
-            "<h3>{}</h3>\
-            <a href=\"{}\">Back</a>\
-            <ul>{}</ul>",
-            path,
-            previous_path,
-            lis.join("")
-        )
+        format!("{}{}{}", header, back, ul)
     }
 }
 
@@ -109,8 +109,8 @@ impl Handler for FileServer {
         if path.is_dir() {
             let links = self.get_filenames(path)?;
             let parent_path = self.get_parent_path(path.parent().unwrap());
-            let html_body = FileServer::build_body(req_url, parent_path, links);
-            let html_page = FileServer::html_template(html_body).into_bytes();
+            let html_body = self.build_body(req_url, parent_path, links);
+            let html_page = self.html_template(html_body).into_bytes();
 
             let res = Response::builder()
                 .header("Content-Type", "text/html; charset=utf-8")
@@ -121,8 +121,9 @@ impl Handler for FileServer {
             return Ok(res);
         }
 
-        let html_not_found_page =
-            FileServer::html_template("<h1>404 Content Not Found</h1>".to_string()).into_bytes();
+        let html_not_found_page = self
+            .html_template("<h1>404 Content Not Found</h1>".to_string())
+            .into_bytes();
 
         let res = Response::builder()
             .status(Status::NotFound)
