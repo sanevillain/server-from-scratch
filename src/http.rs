@@ -1,10 +1,11 @@
+pub mod server;
 pub mod file_server;
-pub mod header;
 pub mod request;
 pub mod response;
-pub mod server;
+pub mod method;
 pub mod status;
-pub mod thread_pool;
+pub mod header;
 pub mod url;
-pub mod version;
 pub mod body;
+pub mod version;
+pub mod thread_pool;

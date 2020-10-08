@@ -27,7 +27,7 @@ impl FromStr for URL {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if !s.starts_with("/") {
-            Err(Error::new(ErrorKind::Other, "Not a valid path"))
+            Err(Error::new(ErrorKind::InvalidInput, "Invalid url!"))
         } else {
             Ok(URL::new(s))
         }

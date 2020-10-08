@@ -20,7 +20,7 @@ impl FromStr for Version {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "HTTP/1.1" => Ok(Version::V1P1),
-            _ => Err(Error::new(ErrorKind::Other, "HTTP version not supported")),
+            _ => Err(Error::new(ErrorKind::InvalidInput, "HTTP version not supported!")),
         }
     }
 }

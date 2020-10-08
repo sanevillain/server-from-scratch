@@ -1,4 +1,4 @@
-use super::{body::Body, header::Header, url::URL, version::Version};
+use super::{body::Body, header::Header, method::Method, url::URL, version::Version};
 use std::{default::Default, error::Error, fmt, str::FromStr};
 
 #[derive(Debug)]
@@ -9,44 +9,6 @@ impl Error for InvalidHttpRequestError {}
 impl fmt::Display for InvalidHttpRequestError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Invalid Http Request!")
-    }
-}
-
-#[derive(Debug)]
-pub enum Method {
-    GET,
-    HEAD,
-    POST,
-    PUT,
-    DELETE,
-    CONNECT,
-    OPTIONS,
-    TRACE,
-    PATCH,
-}
-
-impl Default for Method {
-    fn default() -> Self {
-        Method::GET
-    }
-}
-
-impl FromStr for Method {
-    type Err = InvalidHttpRequestError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "GET" => Ok(Method::GET),
-            "HEAD" => Ok(Method::HEAD),
-            "POST" => Ok(Method::POST),
-            "PUT" => Ok(Method::PUT),
-            "DELETE" => Ok(Method::DELETE),
-            "CONNECT" => Ok(Method::CONNECT),
-            "OPTIONS" => Ok(Method::OPTIONS),
-            "TRACE" => Ok(Method::TRACE),
-            "PATCH" => Ok(Method::PATCH),
-            _ => Err(InvalidHttpRequestError()),
-        }
     }
 }
 
@@ -79,23 +41,23 @@ impl Request {
 
 impl Request {
     fn create_header(header_lines: Vec<&str>) -> Result<Header, InvalidHttpRequestError> {
-        Header::from_lines(header_lines).map_err(|_| InvalidHttpRequestError())
+        let lines = header_lines
+            .iter()
+            .skip(1)
+            .map(|s| *s)
+            .collect::<Vec<&str>>();
+        Header::from_lines(lines).map_err(|_| InvalidHttpRequestError())
     }
 
-    fn create_method(first_header_line: &Vec<&str>) -> Result<Method, InvalidHttpRequestError> {
-        let method = *first_header_line.get(0).ok_or(InvalidHttpRequestError())?;
-        Method::from_str(method)
+    fn create_method(method: &str) -> Result<Method, InvalidHttpRequestError> {
+        Method::from_str(method).map_err(|_| InvalidHttpRequestError())
     }
 
-    fn create_url(first_header_line: &Vec<&str>) -> Result<URL, InvalidHttpRequestError> {
-        let url = *first_header_line.get(1).ok_or(InvalidHttpRequestError())?;
+    fn create_url(url: &str) -> Result<URL, InvalidHttpRequestError> {
         URL::from_str(url).map_err(|_| InvalidHttpRequestError())
     }
 
-    fn create_http_version(
-        first_header_line: &Vec<&str>,
-    ) -> Result<Version, InvalidHttpRequestError> {
-        let http_version = *first_header_line.get(2).ok_or(InvalidHttpRequestError())?;
+    fn create_http_version(http_version: &str) -> Result<Version, InvalidHttpRequestError> {
         Version::from_str(http_version).map_err(|_| InvalidHttpRequestError())
     }
 
@@ -110,28 +72,30 @@ impl FromStr for Request {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let headers_and_body = s.split("\r\n\r\n").collect::<Vec<&str>>();
 
-        let (headers, body) = (
-            headers_and_body.first().ok_or(InvalidHttpRequestError())?,
-            headers_and_body.last().ok_or(InvalidHttpRequestError())?,
-        );
+        let headers = headers_and_body.first().ok_or(InvalidHttpRequestError())?;
+        let body = headers_and_body.last().ok_or(InvalidHttpRequestError())?;
 
         let header_lines = headers.split("\r\n").collect::<Vec<&str>>();
-        let first_header_line = header_lines
+        let fst_header_line = header_lines
             .first()
             .ok_or(InvalidHttpRequestError())?
             .split(" ")
             .collect::<Vec<&str>>();
 
-        let (method, url, http_version, header, body) = (
-            Request::create_method(&first_header_line)?,
-            Request::create_url(&first_header_line)?,
-            Request::create_http_version(&first_header_line)?,
-            Request::create_header(header_lines)?,
-            Request::create_body(body)?,
-        );
+        if fst_header_line.len() < 3 {
+            return Err(InvalidHttpRequestError());
+        }
+
+        let (method_str, url_str, http_version_str) =
+            (fst_header_line[0], fst_header_line[1], fst_header_line[2]);
+
+        let method = Request::create_method(method_str)?;
+        let url = Request::create_url(url_str)?;
+        let http_version = Request::create_http_version(http_version_str)?;
+        let header = Request::create_header(header_lines)?;
+        let body = Request::create_body(body)?;
 
         let req = Request::new(method, url, http_version, header, body);
-
         Ok(req)
     }
 }
